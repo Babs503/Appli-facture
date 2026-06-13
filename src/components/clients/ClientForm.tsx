@@ -6,7 +6,9 @@ import Button from '../common/Button';
 import { Save, X } from 'lucide-react';
 
 interface ClientFormProps {
+  /** Le client à modifier (uniquement en mode édition) */
   client?: Client;
+  /** true = on modifie un client, false = on crée un nouveau (défaut) */
   isEditing?: boolean;
 }
 
