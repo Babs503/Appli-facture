@@ -22,9 +22,9 @@ const Button: React.FC<ButtonProps> = ({
   const getVariantClasses = () => {
     switch (variant) {
       case 'primary':
-        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-white';
+        return 'bg-bsm-orange hover:bg-bsm-orange-dark focus:ring-bsm-orange text-white';
       case 'secondary':
-        return 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-500 text-white';
+        return 'bg-gray-100 hover:bg-gray-200 focus:ring-gray-300 text-gray-700';
       case 'success':
         return 'bg-green-600 hover:bg-green-700 focus:ring-green-500 text-white';
       case 'danger':
@@ -32,11 +32,11 @@ const Button: React.FC<ButtonProps> = ({
       case 'warning':
         return 'bg-yellow-500 hover:bg-yellow-600 focus:ring-yellow-500 text-white';
       case 'info':
-        return 'bg-blue-400 hover:bg-blue-500 focus:ring-blue-400 text-white';
+        return 'bg-bsm-navy hover:bg-bsm-navy-light focus:ring-bsm-navy text-white';
       case 'outline':
-        return 'bg-white border border-gray-300 hover:bg-gray-50 focus:ring-blue-500 text-gray-700';
+        return 'bg-white border border-gray-300 hover:bg-gray-50 focus:ring-bsm-orange text-gray-700';
       default:
-        return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 text-white';
+        return 'bg-bsm-orange hover:bg-bsm-orange-dark focus:ring-bsm-orange text-white';
     }
   };
 
