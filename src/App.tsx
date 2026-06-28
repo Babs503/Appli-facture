@@ -20,6 +20,9 @@ import QuotesPage from './pages/quotes/QuotesPage';
 import NewQuotePage from './pages/quotes/NewQuotePage';
 import EditQuotePage from './pages/quotes/EditQuotePage';
 import QuoteDetailPage from './pages/quotes/QuoteDetailPage';
+import PaymentsPage from './pages/payments/PaymentsPage';
+import NewPaymentPage from './pages/payments/NewPaymentPage';
+import EditPaymentPage from './pages/payments/EditPaymentPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
 // Auth Guards
@@ -57,10 +60,11 @@ function App() {
             <Route path="quotes/:id" element={<QuoteDetailPage />} />
             <Route path="quotes/:id/edit" element={<EditQuotePage />} />
 
-            <Route path="settings" element={<SettingsPage />} />
+            <Route path="payments" element={<PaymentsPage />} />
+            <Route path="payments/new" element={<NewPaymentPage />} />
+            <Route path="payments/:id/edit" element={<EditPaymentPage />} />
 
-            {/* Future route for payments */}
-            <Route path="payments" element={<div className="container mx-auto px-4 py-8">Page Paiements en construction</div>} />
+            <Route path="settings" element={<SettingsPage />} />
           </Route>
           
           {/* Catch all route */}

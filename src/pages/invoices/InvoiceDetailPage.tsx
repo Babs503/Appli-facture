@@ -3,8 +3,8 @@ import { useParams, Navigate, useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import Button from '../../components/common/Button';
 import StatusBadge from '../../components/common/StatusBadge';
-import { formatCurrency, formatDate } from '../../utils/format';
-import { ArrowLeft, Pencil, Trash2, Printer } from 'lucide-react';
+import { formatCurrency, formatDate, paymentMethodLabel } from '../../utils/format';
+import { ArrowLeft, Pencil, Trash2, Printer, Plus } from 'lucide-react';
 
 const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -183,8 +183,13 @@ const InvoiceDetailPage: React.FC = () => {
 
       {/* Paiements rattachés (masqués à l'impression) */}
       <div className="mt-6 bg-white shadow-md rounded-lg overflow-hidden print:hidden">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">Paiements</h3>
+          <Link to={`/payments/new?invoice=${invoice.id}`}>
+            <Button variant="outline" size="sm" icon={<Plus className="h-4 w-4" />}>
+              Enregistrer un paiement
+            </Button>
+          </Link>
         </div>
         {invoicePayments.length > 0 ? (
           <table className="min-w-full divide-y divide-gray-200">
@@ -200,7 +205,7 @@ const InvoiceDetailPage: React.FC = () => {
               {invoicePayments.map((p) => (
                 <tr key={p.id}>
                   <td className="px-6 py-3 text-sm text-gray-500">{formatDate(p.date)}</td>
-                  <td className="px-6 py-3 text-sm text-gray-900">{p.method}</td>
+                  <td className="px-6 py-3 text-sm text-gray-900">{paymentMethodLabel(p.method)}</td>
                   <td className="px-6 py-3 text-sm text-gray-500">{p.reference}</td>
                   <td className="px-6 py-3 text-sm font-medium text-gray-900 text-right">{cur(p.amount)}</td>
                 </tr>

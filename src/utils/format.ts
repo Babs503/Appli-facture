@@ -23,6 +23,24 @@ export const formatDate = (date: Date | string): string => {
 };
 
 /**
+ * Libellé français d'une méthode de paiement.
+ */
+export const paymentMethodLabel = (method: string): string => {
+  switch (method) {
+    case 'cash':
+      return 'Espèces';
+    case 'bank':
+      return 'Virement bancaire';
+    case 'check':
+      return 'Chèque';
+    case 'other':
+      return 'Autre';
+    default:
+      return method;
+  }
+};
+
+/**
  * Calculate invoice totals
  */
 export const calculateInvoiceTotals = (
