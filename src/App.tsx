@@ -13,6 +13,9 @@ import InvoicesPage from './pages/invoices/InvoicesPage';
 import NewInvoicePage from './pages/invoices/NewInvoicePage';
 import EditInvoicePage from './pages/invoices/EditInvoicePage';
 import InvoiceDetailPage from './pages/invoices/InvoiceDetailPage';
+import ProductsPage from './pages/products/ProductsPage';
+import NewProductPage from './pages/products/NewProductPage';
+import EditProductPage from './pages/products/EditProductPage';
 import QuotesPage from './pages/quotes/QuotesPage';
 import NewQuotePage from './pages/quotes/NewQuotePage';
 import EditQuotePage from './pages/quotes/EditQuotePage';
@@ -45,6 +48,10 @@ function App() {
             <Route path="invoices/:id" element={<InvoiceDetailPage />} />
             <Route path="invoices/:id/edit" element={<EditInvoicePage />} />
 
+            <Route path="products" element={<ProductsPage />} />
+            <Route path="products/new" element={<NewProductPage />} />
+            <Route path="products/:id/edit" element={<EditProductPage />} />
+
             <Route path="quotes" element={<QuotesPage />} />
             <Route path="quotes/new" element={<NewQuotePage />} />
             <Route path="quotes/:id" element={<QuoteDetailPage />} />
@@ -52,8 +59,7 @@ function App() {
 
             <Route path="settings" element={<SettingsPage />} />
 
-            {/* Future routes for products, payments */}
-            <Route path="products" element={<div className="container mx-auto px-4 py-8">Page Produits en construction</div>} />
+            {/* Future route for payments */}
             <Route path="payments" element={<div className="container mx-auto px-4 py-8">Page Paiements en construction</div>} />
           </Route>
           
