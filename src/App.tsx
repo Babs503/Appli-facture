@@ -13,6 +13,10 @@ import InvoicesPage from './pages/invoices/InvoicesPage';
 import NewInvoicePage from './pages/invoices/NewInvoicePage';
 import EditInvoicePage from './pages/invoices/EditInvoicePage';
 import InvoiceDetailPage from './pages/invoices/InvoiceDetailPage';
+import QuotesPage from './pages/quotes/QuotesPage';
+import NewQuotePage from './pages/quotes/NewQuotePage';
+import EditQuotePage from './pages/quotes/EditQuotePage';
+import QuoteDetailPage from './pages/quotes/QuoteDetailPage';
 import SettingsPage from './pages/settings/SettingsPage';
 
 // Auth Guards
@@ -41,11 +45,15 @@ function App() {
             <Route path="invoices/:id" element={<InvoiceDetailPage />} />
             <Route path="invoices/:id/edit" element={<EditInvoicePage />} />
 
+            <Route path="quotes" element={<QuotesPage />} />
+            <Route path="quotes/new" element={<NewQuotePage />} />
+            <Route path="quotes/:id" element={<QuoteDetailPage />} />
+            <Route path="quotes/:id/edit" element={<EditQuotePage />} />
+
             <Route path="settings" element={<SettingsPage />} />
 
-            {/* Future routes for products, quotes, payments */}
+            {/* Future routes for products, payments */}
             <Route path="products" element={<div className="container mx-auto px-4 py-8">Page Produits en construction</div>} />
-            <Route path="quotes" element={<div className="container mx-auto px-4 py-8">Page Devis en construction</div>} />
             <Route path="payments" element={<div className="container mx-auto px-4 py-8">Page Paiements en construction</div>} />
           </Route>
           
