@@ -4,7 +4,7 @@ export interface Client {
   address: string;
   phone: string;
   email: string;
-  taxId: string; // NIF/RC
+  taxId: string; // NINEA/RC
   createdAt: Date;
 }
 

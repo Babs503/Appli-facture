@@ -72,25 +72,55 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Persistance locale : version le schéma pour pouvoir invalider en cas de changement de structure
+const STORAGE_KEY = 'appli-facture:data:v1';
+
+interface PersistedData {
+  clients: Client[];
+  products: Product[];
+  invoices: Invoice[];
+  quotes: Quote[];
+  payments: Payment[];
+  settings: AppSettings;
+}
+
+// Charge les données depuis localStorage ; retourne null si absent ou illisible
+const loadPersisted = (): PersistedData | null => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as PersistedData) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State for all data
-  const [clients, setClients] = useState<Client[]>(mockClients);
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices);
-  const [quotes, setQuotes] = useState<Quote[]>(mockQuotes);
-  const [payments, setPayments] = useState<Payment[]>(mockPayments);
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [settings, setSettings] = useState<AppSettings>(mockSettings);
+  // Données initiales : localStorage si disponible, sinon données de démonstration
+  const persisted = loadPersisted();
+
+  const [clients, setClients] = useState<Client[]>(persisted?.clients ?? mockClients);
+  const [products, setProducts] = useState<Product[]>(persisted?.products ?? mockProducts);
+  const [invoices, setInvoices] = useState<Invoice[]>(persisted?.invoices ?? mockInvoices);
+  const [quotes, setQuotes] = useState<Quote[]>(persisted?.quotes ?? mockQuotes);
+  const [payments, setPayments] = useState<Payment[]>(persisted?.payments ?? mockPayments);
+  const [users] = useState<User[]>(mockUsers);
+  const [settings, setSettings] = useState<AppSettings>(persisted?.settings ?? mockSettings);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Initialize with mock data or load from localStorage
+  // Auto-login de démonstration (à remplacer par une vraie authentification)
   useEffect(() => {
-    // In a real app, we would load data from API or localStorage here
-    // For demo, we're using the mock data initialized above
-    
-    // Auto login for demonstration
     setCurrentUser(users[0]);
-  }, []);
+  }, [users]);
+
+  // Sauvegarde automatique dans localStorage à chaque modification des données
+  useEffect(() => {
+    const data: PersistedData = { clients, products, invoices, quotes, payments, settings };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // quota dépassé ou stockage indisponible : on ignore silencieusement
+    }
+  }, [clients, products, invoices, quotes, payments, settings]);
 
   // Client operations
   const addClient = (client: Omit<Client, 'id' | 'createdAt'>) => {
@@ -138,7 +168,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // Invoice operations
   const addInvoice = (invoice: Omit<Invoice, 'id' | 'createdAt' | 'number'>) => {
-    const invoiceNumber = generateInvoiceNumber('FACT', invoices.map(i => i.number));
+    const invoiceNumber = generateInvoiceNumber('FAC', invoices.map(i => i.number));
     const newInvoice: Invoice = {
       ...invoice,
       id: Math.random().toString(36).substring(2, 10),
@@ -188,7 +218,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const quote = getQuoteById(quoteId);
     if (!quote) return undefined;
 
-    const invoiceNumber = generateInvoiceNumber('FACT', invoices.map(i => i.number));
+    const invoiceNumber = generateInvoiceNumber('FAC', invoices.map(i => i.number));
     const newInvoice = quoteToInvoice(quote, invoiceNumber);
     
     setInvoices([...invoices, newInvoice]);
@@ -249,9 +279,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Authentication
-  const login = async (email: string, password: string): Promise<boolean> => {
+  const login = async (email: string, _password: string): Promise<boolean> => {
     // In a real app, we would call an API here
-    // For demo, just check if the user exists
+    // For demo, just check if the user exists (password ignored in this MVP)
     const user = users.find(u => u.email === email);
     if (user) {
       setCurrentUser(user);

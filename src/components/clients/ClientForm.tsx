@@ -119,7 +119,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ client, isEditing = false }) =>
           
           <div>
             <label htmlFor="taxId" className="block text-sm font-medium text-gray-700 mb-1">
-              NIF/RC
+              NINEA/RC
             </label>
             <input
               type="text"

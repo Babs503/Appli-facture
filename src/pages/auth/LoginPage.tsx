@@ -4,7 +4,7 @@ import { Building, Mail, Lock } from 'lucide-react';
 import Button from '../../components/common/Button';
 
 const LoginPage: React.FC = () => {
-  const { login, users } = useApp();
+  const { login, users, settings } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ const LoginPage: React.FC = () => {
       if (!success) {
         setError('Email ou mot de passe incorrect');
       }
-    } catch (err) {
+    } catch {
       setError('Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
@@ -37,10 +37,10 @@ const LoginPage: React.FC = () => {
           <Building className="h-12 w-12 text-blue-600" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          MatConstruct
+          {settings.companyName}
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Application de facturation pour matériaux de construction
+          Application de facturation
         </p>
       </div>
 
@@ -48,7 +48,7 @@ const LoginPage: React.FC = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative\" role="alert">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
                 <span className="block sm:inline">{error}</span>
               </div>
             )}

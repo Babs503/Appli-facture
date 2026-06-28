@@ -4,7 +4,7 @@ import { Menu, X, Building, Users, Package, FileText, FilePenLine, CreditCard, B
 import { useApp } from '../../context/AppContext';
 
 const Navbar: React.FC = () => {
-  const { currentUser, logout } = useApp();
+  const { currentUser, logout, settings } = useApp();
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleMenu = () => {
@@ -20,13 +20,17 @@ const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="bg-blue-900 text-white">
+    <nav className="bg-blue-900 text-white print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center">
-              <Building className="h-8 w-8 mr-2" />
-              <span className="font-bold text-xl">MatConstruct</span>
+              {settings.companyLogo ? (
+                <img src={settings.companyLogo} alt="Logo" className="h-8 w-8 mr-2 object-contain bg-white rounded" />
+              ) : (
+                <Building className="h-8 w-8 mr-2" />
+              )}
+              <span className="font-bold text-xl">{settings.companyName}</span>
             </Link>
           </div>
           

@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 
@@ -10,6 +9,11 @@ import DashboardPage from './pages/DashboardPage';
 import ClientsPage from './pages/clients/ClientsPage';
 import NewClientPage from './pages/clients/NewClientPage';
 import EditClientPage from './pages/clients/EditClientPage';
+import InvoicesPage from './pages/invoices/InvoicesPage';
+import NewInvoicePage from './pages/invoices/NewInvoicePage';
+import EditInvoicePage from './pages/invoices/EditInvoicePage';
+import InvoiceDetailPage from './pages/invoices/InvoiceDetailPage';
+import SettingsPage from './pages/settings/SettingsPage';
 
 // Auth Guards
 import AuthGuard from './components/auth/AuthGuard';
@@ -19,7 +23,7 @@ function App() {
     <AppProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard\" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           
           <Route path="/" element={
             <AuthGuard>
@@ -32,16 +36,21 @@ function App() {
             <Route path="clients/new" element={<NewClientPage />} />
             <Route path="clients/:id/edit" element={<EditClientPage />} />
             
-            {/* Future routes for products, invoices, quotes, payments, settings */}
+            <Route path="invoices" element={<InvoicesPage />} />
+            <Route path="invoices/new" element={<NewInvoicePage />} />
+            <Route path="invoices/:id" element={<InvoiceDetailPage />} />
+            <Route path="invoices/:id/edit" element={<EditInvoicePage />} />
+
+            <Route path="settings" element={<SettingsPage />} />
+
+            {/* Future routes for products, quotes, payments */}
             <Route path="products" element={<div className="container mx-auto px-4 py-8">Page Produits en construction</div>} />
-            <Route path="invoices" element={<div className="container mx-auto px-4 py-8">Page Factures en construction</div>} />
             <Route path="quotes" element={<div className="container mx-auto px-4 py-8">Page Devis en construction</div>} />
             <Route path="payments" element={<div className="container mx-auto px-4 py-8">Page Paiements en construction</div>} />
-            <Route path="settings" element={<div className="container mx-auto px-4 py-8">Page Paramètres en construction</div>} />
           </Route>
           
           {/* Catch all route */}
-          <Route path="*" element={<Navigate to="/\" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AppProvider>

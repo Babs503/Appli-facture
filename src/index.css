@@ -1,3 +1,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Impression : facture seule, fond blanc, sans ombres ni marges superflues */
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .shadow,
+  .shadow-md,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+}
