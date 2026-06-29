@@ -18,6 +18,8 @@ import {
   appSettings as mockSettings
 } from '../data/mockData';
 import { generateInvoiceNumber, generateQuoteNumber, quoteToInvoice } from '../utils/format';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import * as db from '../lib/db';
 
 interface AppContextType {
   // Data
@@ -64,6 +66,7 @@ interface AppContextType {
 
   // Authentication
   login: (email: string, password: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   
   // Settings
@@ -94,26 +97,114 @@ const loadPersisted = (): PersistedData | null => {
   }
 };
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Données initiales : localStorage si disponible, sinon données de démonstration
-  const persisted = loadPersisted();
+// Paramètres par défaut d'un nouveau compte cloud (avant personnalisation)
+const defaultSettings = (): AppSettings => ({
+  companyName: 'Mon entreprise',
+  companyAddress: '',
+  companyPhone: '',
+  companyEmail: '',
+  companyTaxId: '',
+  companyLogo: undefined,
+  defaultTaxRate: 18,
+  defaultPaymentTerms: 'Paiement à 30 jours',
+  currencySymbol: 'FCFA',
+  dateFormat: 'jj/MM/AAAA',
+});
 
-  const [clients, setClients] = useState<Client[]>(persisted?.clients ?? mockClients);
-  const [products, setProducts] = useState<Product[]>(persisted?.products ?? mockProducts);
-  const [invoices, setInvoices] = useState<Invoice[]>(persisted?.invoices ?? mockInvoices);
-  const [quotes, setQuotes] = useState<Quote[]>(persisted?.quotes ?? mockQuotes);
-  const [payments, setPayments] = useState<Payment[]>(persisted?.payments ?? mockPayments);
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // État initial :
+  //  - mode cloud (Supabase configuré) : vide, peuplé après connexion depuis Supabase ;
+  //  - mode démo local : localStorage si présent, sinon données de démonstration.
+  const persisted = isSupabaseConfigured ? null : loadPersisted();
+
+  const [clients, setClients] = useState<Client[]>(isSupabaseConfigured ? [] : (persisted?.clients ?? mockClients));
+  const [products, setProducts] = useState<Product[]>(isSupabaseConfigured ? [] : (persisted?.products ?? mockProducts));
+  const [invoices, setInvoices] = useState<Invoice[]>(isSupabaseConfigured ? [] : (persisted?.invoices ?? mockInvoices));
+  const [quotes, setQuotes] = useState<Quote[]>(isSupabaseConfigured ? [] : (persisted?.quotes ?? mockQuotes));
+  const [payments, setPayments] = useState<Payment[]>(isSupabaseConfigured ? [] : (persisted?.payments ?? mockPayments));
   const [users] = useState<User[]>(mockUsers);
-  const [settings, setSettings] = useState<AppSettings>(persisted?.settings ?? mockSettings);
+  const [settings, setSettings] = useState<AppSettings>(isSupabaseConfigured ? defaultSettings() : (persisted?.settings ?? mockSettings));
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // Auto-login de démonstration (à remplacer par une vraie authentification)
+  // Écrit une modification vers Supabase (mode cloud uniquement), en arrière-plan.
+  // Une erreur réseau est journalisée sans bloquer l'UI (l'état local reste à jour).
+  const sync = (run: (userId: string) => Promise<unknown>) => {
+    if (!isSupabaseConfigured || !currentUser) return;
+    run(currentUser.id).catch((err) => console.error('Synchronisation Supabase échouée', err));
+  };
+
+  // Gestion de session
   useEffect(() => {
-    setCurrentUser(users[0]);
+    // Mode démo local : auto-login sur le premier utilisateur fictif
+    if (!isSupabaseConfigured || !supabase) {
+      setCurrentUser(users[0]);
+      return;
+    }
+
+    // Mode cloud : dériver currentUser de la session Supabase
+    const mapUser = (session: import('@supabase/supabase-js').Session | null): User | null => {
+      const u = session?.user;
+      if (!u) return null;
+      return {
+        id: u.id,
+        name: (u.user_metadata?.name as string) || u.email || '',
+        email: u.email || '',
+        role: 'admin',
+        createdAt: u.created_at ? new Date(u.created_at) : new Date(),
+      };
+    };
+
+    supabase.auth.getSession().then(({ data }) => setCurrentUser(mapUser(data.session)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(mapUser(session));
+    });
+    return () => sub.subscription.unsubscribe();
   }, [users]);
 
-  // Sauvegarde automatique dans localStorage à chaque modification des données
+  // Mode cloud : charger les données de l'utilisateur une fois par session
+  const loadedUserRef = React.useRef<string | null>(null);
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    if (!currentUser) {
+      // déconnexion : repartir d'un état vide
+      loadedUserRef.current = null;
+      setClients([]); setProducts([]); setInvoices([]); setQuotes([]); setPayments([]);
+      setSettings(defaultSettings());
+      return;
+    }
+    if (loadedUserRef.current === currentUser.id) return; // déjà chargé
+    loadedUserRef.current = currentUser.id;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await db.fetchAllData();
+        if (cancelled) return;
+        setClients(data.clients);
+        setProducts(data.products);
+        setInvoices(data.invoices);
+        setQuotes(data.quotes);
+        setPayments(data.payments);
+        if (data.settings) {
+          setSettings(data.settings);
+        } else {
+          // Nouveau compte : créer une ligne de paramètres par défaut
+          const defaults = defaultSettings();
+          setSettings(defaults);
+          db.saveSettings(currentUser.id, defaults).catch((err) =>
+            console.error('Création des paramètres échouée', err)
+          );
+        }
+      } catch (err) {
+        console.error('Chargement des données Supabase échoué', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser]);
+
+  // Mode démo local : sauvegarde automatique dans localStorage à chaque modification
+  useEffect(() => {
+    if (isSupabaseConfigured) return;
     const data: PersistedData = { clients, products, invoices, quotes, payments, settings };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -130,14 +221,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date()
     };
     setClients([...clients, newClient]);
+    sync(uid => db.saveClient(uid, newClient));
   };
 
   const updateClient = (id: string, client: Partial<Client>) => {
+    const existing = clients.find(c => c.id === id);
     setClients(clients.map(c => c.id === id ? { ...c, ...client } : c));
+    if (existing) sync(uid => db.saveClient(uid, { ...existing, ...client }));
   };
 
   const deleteClient = (id: string) => {
     setClients(clients.filter(c => c.id !== id));
+    sync(() => db.deleteClient(id));
   };
 
   const getClientById = (id: string) => {
@@ -152,14 +247,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date()
     };
     setProducts([...products, newProduct]);
+    sync(uid => db.saveProduct(uid, newProduct));
   };
 
   const updateProduct = (id: string, product: Partial<Product>) => {
+    const existing = products.find(p => p.id === id);
     setProducts(products.map(p => p.id === id ? { ...p, ...product } : p));
+    if (existing) sync(uid => db.saveProduct(uid, { ...existing, ...product }));
   };
 
   const deleteProduct = (id: string) => {
     setProducts(products.filter(p => p.id !== id));
+    sync(() => db.deleteProduct(id));
   };
 
   const getProductById = (id: string) => {
@@ -176,14 +275,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date()
     };
     setInvoices([...invoices, newInvoice]);
+    sync(uid => db.saveInvoice(uid, newInvoice));
   };
 
   const updateInvoice = (id: string, invoice: Partial<Invoice>) => {
+    const existing = invoices.find(i => i.id === id);
     setInvoices(invoices.map(i => i.id === id ? { ...i, ...invoice } : i));
+    if (existing) sync(uid => db.saveInvoice(uid, { ...existing, ...invoice }));
   };
 
   const deleteInvoice = (id: string) => {
     setInvoices(invoices.filter(i => i.id !== id));
+    sync(() => db.deleteInvoice(id));
   };
 
   const getInvoiceById = (id: string) => {
@@ -200,14 +303,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       createdAt: new Date()
     };
     setQuotes([...quotes, newQuote]);
+    sync(uid => db.saveQuote(uid, newQuote));
   };
 
   const updateQuote = (id: string, quote: Partial<Quote>) => {
+    const existing = quotes.find(q => q.id === id);
     setQuotes(quotes.map(q => q.id === id ? { ...q, ...quote } : q));
+    if (existing) sync(uid => db.saveQuote(uid, { ...existing, ...quote }));
   };
 
   const deleteQuote = (id: string) => {
     setQuotes(quotes.filter(q => q.id !== id));
+    sync(() => db.deleteQuote(id));
   };
 
   const getQuoteById = (id: string) => {
@@ -222,8 +329,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newInvoice = quoteToInvoice(quote, invoiceNumber);
     
     setInvoices([...invoices, newInvoice]);
+    sync(uid => db.saveInvoice(uid, newInvoice));
     updateQuote(quoteId, { status: 'converted' });
-    
+
     return newInvoice.id;
   };
 
@@ -239,21 +347,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const recalcInvoiceStatuses = (invoiceIds: string[], nextPayments: Payment[]) => {
     const ids = [...new Set(invoiceIds)];
     if (ids.length === 0) return;
+
+    // Décider du nouveau statut depuis l'instantané courant des factures
+    const changes = new Map<string, Invoice['status']>();
+    ids.forEach(id => {
+      const inv = invoices.find(i => i.id === id);
+      if (!inv) return;
+      const totalPaid = nextPayments
+        .filter(p => p.invoiceId === id)
+        .reduce((sum, p) => sum + p.amount, 0);
+      let status = inv.status;
+      if (totalPaid >= inv.total) status = 'paid';
+      else if (inv.status === 'paid') status = 'sent';
+      if (status !== inv.status) changes.set(id, status);
+    });
+    if (changes.size === 0) return;
+
+    // Une seule mise à jour fonctionnelle applique tous les changements de statut
     setInvoices(prev =>
-      prev.map(inv => {
-        if (!ids.includes(inv.id)) return inv;
-        const totalPaid = nextPayments
-          .filter(p => p.invoiceId === inv.id)
-          .reduce((sum, p) => sum + p.amount, 0);
-        if (totalPaid >= inv.total) {
-          return inv.status === 'paid' ? inv : { ...inv, status: 'paid' };
-        }
-        if (inv.status === 'paid') {
-          return { ...inv, status: 'sent' };
-        }
-        return inv;
-      })
+      prev.map(inv => (changes.has(inv.id) ? { ...inv, status: changes.get(inv.id)! } : inv))
     );
+    // Persister chaque facture dont le statut a changé (mode cloud)
+    changes.forEach((status, id) => {
+      const inv = invoices.find(i => i.id === id);
+      if (inv) sync(uid => db.saveInvoice(uid, { ...inv, status }));
+    });
   };
 
   const addPayment = (payment: Omit<Payment, 'id' | 'createdAt'>) => {
@@ -264,6 +382,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     const next = [...payments, newPayment];
     setPayments(next);
+    sync(uid => db.savePayment(uid, newPayment));
     recalcInvoiceStatuses([newPayment.invoiceId], next);
   };
 
@@ -271,6 +390,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const existing = getPaymentById(id);
     const next = payments.map(p => p.id === id ? { ...p, ...payment } : p);
     setPayments(next);
+    if (existing) sync(uid => db.savePayment(uid, { ...existing, ...payment }));
     // Recalculer l'ancienne et la nouvelle facture (le montant ou la facture liée a pu changer)
     const affected = [existing?.invoiceId, payment.invoiceId].filter(Boolean) as string[];
     recalcInvoiceStatuses(affected, next);
@@ -281,6 +401,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!payment) return;
     const next = payments.filter(p => p.id !== id);
     setPayments(next);
+    sync(() => db.deletePayment(id));
     recalcInvoiceStatuses([payment.invoiceId], next);
   };
 
@@ -293,9 +414,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Authentication
-  const login = async (email: string, _password: string): Promise<boolean> => {
-    // In a real app, we would call an API here
-    // For demo, just check if the user exists (password ignored in this MVP)
+  const login = async (email: string, password: string): Promise<boolean> => {
+    if (isSupabaseConfigured && supabase) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      return !error;
+    }
+    // Mode démo local : on vérifie seulement que l'email existe (mot de passe ignoré)
     const user = users.find(u => u.email === email);
     if (user) {
       setCurrentUser(user);
@@ -304,13 +428,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return false;
   };
 
+  const signup = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ ok: boolean; error?: string }> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { ok: false, error: "L'inscription nécessite la configuration de Supabase." };
+    }
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  };
+
   const logout = () => {
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.signOut().catch((err) => console.error('Déconnexion échouée', err));
+    }
     setCurrentUser(null);
   };
 
   // Settings
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings({ ...settings, ...newSettings });
+    const merged = { ...settings, ...newSettings };
+    setSettings(merged);
+    sync(uid => db.saveSettings(uid, merged));
   };
 
   return (
@@ -353,8 +499,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         getPaymentsByInvoiceId,
         
         login,
+        signup,
         logout,
-        
+
         updateSettings
       }}
     >

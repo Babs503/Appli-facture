@@ -14,7 +14,13 @@ Appli-facture is a French-language invoicing/billing single-page app targeting S
 - **Date format: `jj/MM/AAAA`** (day/month/year, `fr-FR`).
 - **Invoice numbering: `FAC-AAAA-NNNN`** — prefix `FAC`, 4-digit zero-padded sequence per year.
 
-Current state: front-end-only MVP. Data is seeded from mock data and **persisted to `localStorage`** (no backend/database yet). Implemented modules: **Dashboard, Clients, Factures (invoices)** — full CRUD + detail/print view. Still stubbed placeholders ("en construction"): **Produits, Devis, Paiements, Paramètres**.
+Current state: all modules implemented — **Dashboard, Clients, Produits, Factures (invoices), Devis (quotes), Paiements, Paramètres** — full CRUD + detail/print views. Invoice/quote detail pages are print-ready (A4 print CSS in `src/index.css`, "Imprimer" → browser Save-as-PDF).
+
+**Two runtime modes (see `src/lib/supabase.ts`):**
+- **Cloud mode** — when `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set (`.env.local`): real Supabase Auth (email/password + in-app signup) and per-user data with Row Level Security. Data loads from Supabase on login and is written through on every mutation.
+- **Demo/local mode** — when those vars are absent: auto-login as `users[0]`, data seeded from mock data and persisted to `localStorage` (key `appli-facture:data:v1`).
+
+The `useApp()` CRUD interface is **identical in both modes** — components never branch on the mode.
 
 ## Commands
 
@@ -26,19 +32,21 @@ npm run preview    # serve the production build
 npm run lint       # ESLint over the whole project
 ```
 
+**Supabase setup (cloud mode):** create a project, run `supabase/schema.sql` in the SQL Editor (tables + RLS), then copy `.env.example` to `.env.local` and fill `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (Project Settings > API). Without `.env.local` the app runs in demo/local mode. `.env.local` is gitignored — never commit keys.
+
 There is no test runner configured — no `test` script, no test framework in devDependencies. Do not invent test commands; if tests are needed, set up the tooling first.
 
 ## Architecture
 
 Stack: React 18 + TypeScript + Vite, React Router v6, Tailwind CSS, lucide-react icons.
 
-**Single global store via Context.** `src/context/AppContext.tsx` is the heart of the app. It holds *all* domain state (clients, products, invoices, quotes, payments, users, settings, currentUser) in `useState` and exposes every mutation as a CRUD function (`addClient`, `updateInvoice`, `convertQuoteToInvoice`, etc.). Components read and write through the `useApp()` hook — there is no Redux, no server calls, no React Query. When adding a feature, extend the `AppContextType` interface and the provider value together. State is seeded from `src/data/mockData.ts`, then **loaded from / saved to `localStorage`** (key `appli-facture:data:v1`) via two `useEffect`s — clients/products/invoices/quotes/payments/settings persist across reloads; `users` and `currentUser` are not persisted (auto-login remains a demo). Note: persisted dates come back as ISO **strings**, so date helpers accept `Date | string`.
+**Single global store via Context.** `src/context/AppContext.tsx` is the heart of the app. It holds *all* domain state (clients, products, invoices, quotes, payments, users, settings, currentUser) in `useState` and exposes every mutation as a CRUD function (`addClient`, `updateInvoice`, `convertQuoteToInvoice`, etc.). Components read and write through the `useApp()` hook — there is no Redux, no server calls, no React Query. When adding a feature, extend the `AppContextType` interface and the provider value together. **Persistence is mode-aware**: in cloud mode each mutation also writes through to Supabase via the `sync(uid => db.saveX(...))` helper (fire-and-forget, errors logged), and data is loaded once per session from `src/lib/db.ts` (`fetchAllData`); in demo mode state is seeded from `src/data/mockData.ts` and saved to `localStorage`. When adding a new persisted entity, add the `sync(...)` write-through calls in its add/update/delete and a mapper + save/delete in `src/lib/db.ts`. `src/lib/db.ts` maps snake_case Postgres columns ↔ camelCase types and uses `upsert` for both add and update (client-generated `id` is the PK). Note: dates may come back as ISO **strings** (localStorage) or `Date` (Supabase mapper converts), so date helpers accept `Date | string`.
 
 **Domain model lives in one file.** `src/types/index.ts` defines every entity (`Client`, `Product`, `Invoice`, `Quote`, `Payment`, `User`, `AppSettings`) and the status string-literal unions (e.g. invoice `'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'`). Treat this as the source of truth; changing a shape here ripples through context and components.
 
 **Business logic is centralized in `src/utils/format.ts`**, not in components: `calculateInvoiceTotals` (subtotal → discount per line → tax → shipping, all rounded to integers), `generateInvoiceNumber`/`generateQuoteNumber` (`FAC`/`DEV` prefix + 4-digit per-year sequence), `quoteToInvoice` (typed `Quote → Invoice`), and the `formatCurrency`/`formatDate` helpers. Reuse these rather than recomputing totals or formatting inline. IDs are generated with `Math.random().toString(36).substring(2, 10)`.
 
-**Routing & auth.** `src/App.tsx` wires routes: `AppProvider` → `Router` → an `AuthGuard`-protected branch rendering `MainLayout` (which holds the `<Outlet/>` + `Navbar`). `src/components/auth/AuthGuard.tsx` gates on `currentUser`, but the MVP **auto-logs-in as `users[0]`** in the provider's `useEffect`, so the guard rarely blocks. `login()` only checks that an email exists (password param is `_password`, ignored). The Factures routes (`/invoices`, `/invoices/new`, `/invoices/:id`, `/invoices/:id/edit`) are wired to real pages; remaining stubbed routes (products, quotes, payments, settings) render inline placeholder divs in `App.tsx` — replace these with real pages as features are built.
+**Routing & auth.** `src/App.tsx` wires routes: `AppProvider` → `Router` → an `AuthGuard`-protected branch rendering `MainLayout` (which holds the `<Outlet/>` + `Navbar`). `src/components/auth/AuthGuard.tsx` gates on `currentUser`. In **cloud mode**, `currentUser` is derived from the Supabase session (`getSession` + `onAuthStateChange`); `login`/`signup`/`logout` call Supabase Auth and `LoginPage` shows a login/signup toggle. In **demo mode**, the provider auto-logs-in as `users[0]` and `login()` only checks that an email exists (password ignored); `LoginPage` shows the demo-accounts hint. All feature routes (clients, products, invoices, quotes, payments, settings) are wired to real pages.
 
 **Folder conventions** under `src/`: `pages/` = route-level screens (feature-subfoldered, e.g. `pages/clients/`), `components/` = reusable UI grouped by domain (`clients/`, `dashboard/`, `auth/`) plus `components/common/` for shared primitives (`Button`, `Navbar`, `PageHeader`, `StatusBadge`). `layouts/` holds `MainLayout`. Follow the existing **invoices feature** (`pages/invoices/*` + `components/invoices/InvoiceForm`/`InvoiceList`) as the closest template when building out Devis (quasi-identical) and Paiements; the clients feature is the template for simpler entities (Produits).
 
