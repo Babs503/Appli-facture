@@ -124,6 +124,18 @@ create policy "settings_owner" on public.settings
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Privilèges : le rôle des utilisateurs connectés (authenticated) doit pouvoir
+-- accéder aux tables ; la Row Level Security ci-dessus restreint ensuite aux
+-- lignes du compte. Le rôle anon (non connecté) n'a aucun accès.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on
+  public.clients, public.products, public.invoices,
+  public.quotes, public.payments, public.settings
+to authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Index utiles pour les requêtes filtrées par utilisateur
 -- ─────────────────────────────────────────────────────────────────────────────
 
