@@ -228,46 +228,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // Payment operations
+
+  /**
+   * Recalcule le statut des factures concernées d'après la liste de paiements à jour.
+   * Soldée (payé ≥ total) → 'paid' ; une facture marquée 'paid' qui ne l'est plus repasse
+   * en 'sent'. Les autres statuts (draft/overdue/cancelled) sont préservés.
+   * Mise à jour fonctionnelle pour traiter sans risque plusieurs factures à la fois
+   * (ex. un paiement déplacé d'une facture vers une autre).
+   */
+  const recalcInvoiceStatuses = (invoiceIds: string[], nextPayments: Payment[]) => {
+    const ids = [...new Set(invoiceIds)];
+    if (ids.length === 0) return;
+    setInvoices(prev =>
+      prev.map(inv => {
+        if (!ids.includes(inv.id)) return inv;
+        const totalPaid = nextPayments
+          .filter(p => p.invoiceId === inv.id)
+          .reduce((sum, p) => sum + p.amount, 0);
+        if (totalPaid >= inv.total) {
+          return inv.status === 'paid' ? inv : { ...inv, status: 'paid' };
+        }
+        if (inv.status === 'paid') {
+          return { ...inv, status: 'sent' };
+        }
+        return inv;
+      })
+    );
+  };
+
   const addPayment = (payment: Omit<Payment, 'id' | 'createdAt'>) => {
     const newPayment: Payment = {
       ...payment,
       id: Math.random().toString(36).substring(2, 10),
       createdAt: new Date()
     };
-    setPayments([...payments, newPayment]);
-    
-    // Update invoice status if fully paid
-    const invoice = getInvoiceById(payment.invoiceId);
-    if (invoice) {
-      const invoicePayments = [...payments, newPayment].filter(p => p.invoiceId === payment.invoiceId);
-      const totalPaid = invoicePayments.reduce((sum, p) => sum + p.amount, 0);
-      
-      if (totalPaid >= invoice.total) {
-        updateInvoice(invoice.id, { status: 'paid' });
-      }
-    }
+    const next = [...payments, newPayment];
+    setPayments(next);
+    recalcInvoiceStatuses([newPayment.invoiceId], next);
   };
 
   const updatePayment = (id: string, payment: Partial<Payment>) => {
-    setPayments(payments.map(p => p.id === id ? { ...p, ...payment } : p));
+    const existing = getPaymentById(id);
+    const next = payments.map(p => p.id === id ? { ...p, ...payment } : p);
+    setPayments(next);
+    // Recalculer l'ancienne et la nouvelle facture (le montant ou la facture liée a pu changer)
+    const affected = [existing?.invoiceId, payment.invoiceId].filter(Boolean) as string[];
+    recalcInvoiceStatuses(affected, next);
   };
 
   const deletePayment = (id: string) => {
     const payment = getPaymentById(id);
     if (!payment) return;
-    
-    setPayments(payments.filter(p => p.id !== id));
-    
-    // Update invoice status if needed
-    const invoice = getInvoiceById(payment.invoiceId);
-    if (invoice && invoice.status === 'paid') {
-      const remainingPayments = payments.filter(p => p.invoiceId === payment.invoiceId && p.id !== id);
-      const totalPaid = remainingPayments.reduce((sum, p) => sum + p.amount, 0);
-      
-      if (totalPaid < invoice.total) {
-        updateInvoice(invoice.id, { status: 'sent' });
-      }
-    }
+    const next = payments.filter(p => p.id !== id);
+    setPayments(next);
+    recalcInvoiceStatuses([payment.invoiceId], next);
   };
 
   const getPaymentById = (id: string) => {
