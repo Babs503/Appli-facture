@@ -2,15 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Impression : facture seule, fond blanc, sans ombres ni marges superflues */
+/* Impression / export PDF : facture ou devis seul, mis en page pour une feuille A4.
+   « Imprimer » (window.print) permet aussi d'« Enregistrer en PDF » côté navigateur. */
 @media print {
+  /* Page A4 avec marges raisonnables pour l'en-tête société et les totaux */
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
   body {
     background: #fff;
+  }
+
+  /* Conserver les couleurs d'accent (total, badge de statut) à l'impression */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Le document occupe toute la largeur utile, sans marge ni ombre superflues */
+  .container {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .shadow,
   .shadow-md,
   .shadow-lg {
     box-shadow: none !important;
+  }
+
+  /* Carte du document : à plat, sans coins arrondis ni rembourrage excessif */
+  .rounded-lg {
+    border-radius: 0 !important;
+  }
+
+  /* Éviter de couper une ligne d'article ou un bloc en travers de deux pages */
+  tr,
+  thead,
+  img {
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group; /* répète l'en-tête du tableau sur chaque page */
   }
 }
